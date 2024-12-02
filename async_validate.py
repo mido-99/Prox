@@ -5,16 +5,27 @@ import time
 
 #? Before you start; refresh your proxy list by visiting: https://proxyscrape.com/free-proxy-list
 #? as most proxies would be dead by the next time you come here
-
+#? OR you can use this api directly: https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text
 
 semaphore = asyncio.Semaphore(500)
 
-with open('proxies.txt', 'r') as file:
+def load_from_txt_file(filepath: str):
     '''Load & prepare proxies in scheme http://ip:port from proxies.txt'''    
 
-    content = file.read()
-    proxies = [f"http://{str(proxy['ip'])}:{str(proxy['port'])}" for proxy in 
-               json.loads(content)['proxies']]
+    with open(filepath, 'r') as file:
+        content = file.read()
+        proxies = [f"http://{str(proxy['ip'])}:{str(proxy['port'])}" for proxy in 
+                json.loads(content)['proxies']]
+        
+    return proxies
+
+def load_from_api(url: str):
+
+    r = httpx.get(url)
+    raw_proxies = r.text.split('\n')
+    proxies = list(map(str.strip, raw_proxies))
+    return proxies
+
 
 async def check_proxy(proxy):
     '''Test each proxy against https://ipinfo.io/json'''
@@ -42,6 +53,8 @@ async def check_proxy(proxy):
 async def main():
     '''Iterate over proxies for testing'''
 
+    # proxies = load_from_txt_file('proxies.txt')
+    proxies =  load_from_api('https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text')
     tasks = [check_proxy(proxy) for proxy in proxies]
     results = await asyncio.gather(*tasks)
     valid = [proxy for proxy in results if proxy]
@@ -51,8 +64,9 @@ async def main():
         with open('valid.txt', 'w') as file:
             file.writelines(f'{line}\n' for line in valid)
 
+
 time1 = time.perf_counter()
 asyncio.run(main())
 time2 = time.perf_counter()
 
-print('Execution time: ', time2 - time1)
+print('Execution time:-', time2 - time1)
