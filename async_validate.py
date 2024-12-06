@@ -27,6 +27,8 @@ def load_from_api(url: str):
     r = httpx.get(url)
     raw_proxies = r.text.split('\n')
     proxies = list(map(str.strip, raw_proxies))
+    proxies = [proxy for proxy in proxies if not proxy.startswith('sock')]
+    
     return proxies
 
 async def load_from_api_2():
@@ -49,9 +51,6 @@ async def load_from_api_2():
 async def check_proxy(proxy):
     '''Test each proxy against https://ipinfo.io/json'''
 
-    if proxy.startswith('sock'):
-        return None
-    
     async with semaphore:
         proxies={
             'http://': proxy,
@@ -59,12 +58,13 @@ async def check_proxy(proxy):
             }
 
         try:
-            async with httpx.AsyncClient(proxies=proxies, timeout=10) as client:
+            async with httpx.AsyncClient(proxies=proxies, timeout=30) as client:
                 r = await client.get('https://ipinfo.io/json')
                 r2 = await client.get('https://httpbin.org/ip')
                 r3 = await client.get('http://lumtest.com/myip.json')
 
-                if (r.status_code + r2.status_code + r3.status_code) == 600:
+                if r.status_code ==200 or r2.status_code ==200 or r3.status_code ==200:
+                # if r.status_code == 200:
                     print('Valid: ', proxy, '-----', r.text)
                     return proxy
         except:
